@@ -1,0 +1,23 @@
+{
+    "name": "server",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "ts-node src/index.ts"
+    },
+    "dependencies": {
+        "@repo/shared": "*",
+        "@trpc/server": "^10.45.0",
+        "fastify": "^4.26.0",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@prisma/client": "^6.19.2",
+        "@types/node": "^20.0.0",
+        "prisma": "^6.19.2",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.4.0"
+    }
+}

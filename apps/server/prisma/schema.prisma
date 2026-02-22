@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Better Auth core tables ──────────────────────────────────────────────────
+
+model User {
+  id            String         @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  profile       Profile?
+  articles      ScoredArticle[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+// ── Ousi tables ───────────────────────────────────────────────────────────────
+
+model Profile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userIdentikit       Json?
+  newsletterFrequency String   @default("daily")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Per-user scored articles from the pipeline
+model ScoredArticle {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url                 String
+  urlHash             String    // sha256 of url
+  title               String
+  description         String?   // short snippet from source
+  summary             String    @db.Text  // Deepseek brief summary
+  personalizedContent String?   @db.Text  // Deepseek full personalized article (phase 2)
+  rawContent          String?   @db.Text  // Firecrawl raw scraped markdown (phase 2)
+  relevanceScore      Int       // 1–10
+  source              String    // "newsapi" | "rss"
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([userId, urlHash])
+  @@index([userId, relevanceScore(sort: Desc)])
+  @@map("scored_article")
+}

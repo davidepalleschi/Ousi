@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Color variables ────────────────────────────────────────────── */
+:root {
+  --font-inter: 'Inter', sans-serif;
+
+  /* Ousi palette — used on elements, not backgrounds */
+  --ousi-cream: #D9D4C7;
+  --ousi-brown: #735F3C;
+  --ousi-tan: #A6926D;
+  --ousi-stone: #BFB8AA;
+  --ousi-dark: #261807;
+
+  /* Neutral backgrounds */
+  --bg: #f4f4f5;
+  /* light gray */
+  --bg-surface: #ebebec;
+  --fg: #1a1a1a;
+  /* text */
+  --border: rgba(0, 0, 0, 0.12);
+}
+
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171717;
+    /* dark gray */
+    --bg-surface: #222222;
+    --fg: var(--ousi-cream);
+    --border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ── Base reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 17px;
+  font-family: var(--font-inter);
+  background-color: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+::selection {
+  background-color: var(--ousi-tan);
+  color: #fff;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ousi-brown);
+  border-radius: 3px;
+}

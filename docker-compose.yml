@@ -1,0 +1,27 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ousi:ousi@db:5432/ousi?schema=public}
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-ousi}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ousi_secret_password}
+      - POSTGRES_DB=${POSTGRES_DB:-ousi}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+volumes:
+  db_data:

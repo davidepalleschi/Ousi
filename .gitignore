@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+.next
+.turbo
+dist
+build
+out
+.output
+
+# Cache
+.cache
+*.tsbuildinfo
+.eslintcache
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+apps/**/.env
+apps/**/.env.local
+packages/**/.env
+packages/**/.env.local
+services/**/.env
+services/**/.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Test coverage
+coverage
+.nyc_output
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea
+
+# Vercel
+.vercel
+
+# Docker volumes / secrets
+docker-compose.override.yml
+services/firecrawl/

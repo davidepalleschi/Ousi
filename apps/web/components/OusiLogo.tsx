@@ -1,0 +1,54 @@
+import * as React from "react";
+
+/**
+ * OusiLogo — Il logo a mirino di Ousi.
+ * Accepta `color` per sovrascrivere il fill del SVG (default: ousi-tan #A6926D).
+ * Usa `currentColor` nei className per adattarlo ai CSS vars se preferito.
+ */
+interface OusiLogoProps {
+    size?: number;
+    color?: string;
+    className?: string;
+}
+
+export function OusiLogo({ size = 48, color = "#A6926D", className }: OusiLogoProps) {
+    return (
+        <svg
+            version="1.0"
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 499 495"
+            preserveAspectRatio="xMidYMid meet"
+            aria-label="Ousi logo"
+            role="img"
+            className={className}
+        >
+            <g
+                transform="translate(0,495) scale(0.1,-0.1)"
+                fill={color}
+                stroke="none"
+            >
+                <path d="M2240 4456 c0 -289 10 -259 -95 -271 -90 -10 -271 -58 -376 -100
+-389 -154 -717 -453 -904 -826 -41 -80 -105 -243 -105 -265 0 -11 28 -14 158
+-14 l157 0 56 118 c184 381 519 654 931 756 104 26 281 46 416 46 l72 0 0 405
+0 405 -155 0 -155 0 0 -254z"/>
+                <path d="M2890 3965 c0 -116 3 -165 11 -165 7 0 53 -20 103 -43 144 -69 268
+-158 391 -281 165 -166 261 -321 335 -545 53 -158 70 -266 70 -443 l0 -148
+410 0 410 0 0 150 0 150 -254 0 c-276 0 -266 -2 -266 57 0 48 -41 229 -76 333
+-147 440 -455 794 -868 996 -87 42 -243 104 -263 104 -2 0 -3 -74 -3 -165z"/>
+                <path d="M2310 2707 c-19 -6 -54 -30 -77 -53 -83 -84 -92 -212 -20 -306 63
+-82 187 -113 282 -69 178 81 178 340 0 422 -45 21 -129 23 -185 6z"/>
+                <path d="M170 2490 l0 -150 257 -2 258 -3 8 -50 c45 -286 124 -508 254 -712
+161 -255 430 -495 698 -623 94 -45 235 -100 256 -100 5 0 9 67 9 160 l0 160
+-41 17 c-193 77 -402 226 -534 380 -227 265 -345 592 -345 959 l0 114 -410 0
+-410 0 0 -150z"/>
+                <path d="M3710 1989 c0 -24 -91 -203 -145 -283 -73 -110 -215 -260 -323 -340
+-47 -36 -133 -89 -191 -119 -212 -110 -383 -153 -645 -164 l-166 -6 0 -404 0
+-403 155 0 155 0 0 254 0 255 48 6 c212 29 378 81 567 175 181 90 302 178 445
+320 143 143 230 264 320 445 55 111 110 247 110 272 0 1 -74 3 -165 3 -116 0
+-165 -3 -165 -11z"/>
+            </g>
+        </svg>
+    );
+}
