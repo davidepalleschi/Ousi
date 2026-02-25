@@ -23,20 +23,22 @@ type ProgressEvent =
 // ── Phase 1: Batch Deepseek scoring ───────────────────────────────────────
 async function batchScore(
     articles: Array<{ title: string; description: string }>,
-    identikit: { role: string; skills: string[]; interests: string[]; avoidTopics: string[] }
-): Promise<Array<{ score: number; summary: string }>> {
-    const prompt = `Sei un assistente di curazione notizie. Profilo utente:
-- Ruolo: ${identikit.role}
-- Competenze: ${(identikit.skills ?? []).join(", ")}
-- Interessi: ${(identikit.interests ?? []).join(", ")}
-- Argomenti da evitare ASSOLUTAMENTE: ${(identikit.avoidTopics ?? []).join(", ")}
+    identikit: { role: string; skills: string[]; interests: string[]; avoidTopics: string[]; aiProfile?: string }
+): Promise<Array<{ score: number; summary: string; translatedTitle: string; tags: string[] }>> {
+    const profileSection = identikit.aiProfile
+        ? `Profilo narrativo dell'utente:\n"${identikit.aiProfile}"\n\nDettagli tecnici:\n- Ruolo: ${identikit.role}\n- Competenze: ${(identikit.skills ?? []).join(", ")}\n- Argomenti da evitare ASSOLUTAMENTE: ${(identikit.avoidTopics ?? []).join(", ")}`
+        : `- Ruolo: ${identikit.role}\n- Competenze: ${(identikit.skills ?? []).join(", ")}\n- Interessi: ${(identikit.interests ?? []).join(", ")}\n- Argomenti da evitare ASSOLUTAMENTE: ${(identikit.avoidTopics ?? []).join(", ")}`;
 
-Per ogni articolo nella lista JSON, assegna un punteggio di rilevanza da 1 a 10 e scrivi un brevissimo sommario (1 frase in italiano).
+    const prompt = `Sei un assistente di curazione notizie. Profilo utente:
+${profileSection}
+
+Per ogni articolo nella lista JSON, assegna un punteggio di rilevanza da 1 a 10, scrivi un brevissimo sommario (1 frase in italiano), traduci il titolo in italiano e aggiungi 2-3 tag di categoria pertinenti.
 
 Regole:
 - Score 9-10: articolo perfettamente in linea col profilo
 - Score 1-3: argomento irrilevante o da evitare
-- Rispondi SOLO con un array JSON, stesso ordine dell'input: [{"score": N, "summary": "..."}, ...]
+- MUST return a valid JSON array ONLY, without wrapping markdown blocks, in this exact format:
+[{"score": 9, "summary": "...", "translatedTitle": "Titolo in Italiano...", "tags": ["Tech", "AI"]}, ...]
 
 Lista articoli:
 ${JSON.stringify(articles.map((a, i) => ({ i, title: a.title, description: a.description })))}`;
@@ -51,12 +53,12 @@ ${JSON.stringify(articles.map((a, i) => ({ i, title: a.title, description: a.des
             model: "deepseek-chat",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.2,
-            max_tokens: 2000,
+            max_tokens: 8000,
         }),
         signal: AbortSignal.timeout(60_000),
     });
 
-    if (!res.ok) return articles.map(() => ({ score: 5, summary: "" }));
+    if (!res.ok) return articles.map(() => ({ score: 5, summary: "", translatedTitle: "", tags: [] }));
 
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content ?? "[]";
@@ -67,9 +69,13 @@ ${JSON.stringify(articles.map((a, i) => ({ i, title: a.title, description: a.des
         return parsed.map((p: any) => ({
             score: typeof p.score === "number" ? Math.round(p.score) : 5,
             summary: typeof p.summary === "string" ? p.summary : "",
+            translatedTitle: typeof p.translatedTitle === "string" ? p.translatedTitle : "",
+            tags: Array.isArray(p.tags) ? p.tags : [],
         }));
-    } catch {
-        return articles.map(() => ({ score: 5, summary: "" }));
+    } catch (e) {
+        console.error("[batchScore] Fallimento nel parsing del JSON restituito da Deepseek:", e);
+        console.error("[batchScore] Output grezzo del modello:", raw);
+        return articles.map(() => ({ score: 5, summary: "", translatedTitle: "", tags: [] }));
     }
 }
 
@@ -129,8 +135,12 @@ ${rawContent.slice(0, 8000)}`;
 async function personalizeWithDeepseek(
     content: string,
     title: string,
-    identikit: { role: string; skills: string[]; interests: string[]; avoidTopics: string[] }
+    identikit: { role: string; skills: string[]; interests: string[]; avoidTopics: string[]; aiProfile?: string }
 ): Promise<string> {
+    const profileSection = identikit.aiProfile
+        ? `Profilo utente:\n"${identikit.aiProfile}"`
+        : `- Ruolo: ${identikit.role}\n- Competenze: ${(identikit.skills ?? []).join(", ")}\n- Interessi: ${(identikit.interests ?? []).join(", ")}`;
+
     const prompt = `Hai estratto il contenuto grezzo di una pagina web che può contenere: menu di navigazione, pubblicità, pop-up, cookie banner, link "iscriviti", sezioni "articoli correlati", note legali. Ignora tutto questo materiale.
 
 Tuo compito: estrai SOLO il contenuto giornalistico dell'articolo "${title}" e riscrivilo in italiano con questa struttura Markdown obbligatoria:
@@ -140,9 +150,7 @@ Tuo compito: estrai SOLO il contenuto giornalistico dell'articolo "${title}" e r
 
 ## Approfondimento personalizzato
 [Analisi di 300-400 parole adattata al profilo:
-- Ruolo: ${identikit.role}
-- Competenze: ${(identikit.skills ?? []).join(", ")}
-- Interessi: ${(identikit.interests ?? []).join(", ")}
+${profileSection}
 Evidenzia gli aspetti più rilevanti per questo profilo, usa **grassetto** per i concetti chiave ed elenchi puntati dove utile]
 
 Regole ferree:
@@ -193,19 +201,26 @@ export async function POST(req: NextRequest) {
                     return;
                 }
                 const identikit = profile.userIdentikit as {
-                    role: string; skills: string[]; interests: string[]; avoidTopics: string[];
+                    role: string; skills: string[]; interests: string[]; avoidTopics: string[]; aiProfile?: string;
                 };
 
                 // Step 2: Discovery
                 send({ type: "status", icon: "🔍", message: "Ricerca articoli in corso…" });
-                const baseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:3001";
+                // Usa l'origine della richiesta corrente invece di un localhost hardcoded
+                const baseUrl = req.nextUrl.origin;
                 const discoverRes = await fetch(`${baseUrl}/api/feed/discover`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", cookie: cookieHeader },
                     body: JSON.stringify({ interests: identikit.interests, skills: identikit.skills, role: identikit.role }),
                 });
                 if (!discoverRes.ok) {
-                    send({ type: "error", message: "Errore nella ricerca articoli." });
+                    const errorText = await discoverRes.text().catch(() => "Impossibile leggere il messaggio di errore");
+                    console.error("[Refresh API] Errore da /api/feed/discover:", {
+                        status: discoverRes.status,
+                        url: `${baseUrl}/api/feed/discover`,
+                        error: errorText
+                    });
+                    send({ type: "error", message: `Errore nella ricerca articoli: ${discoverRes.status}` });
                     controller.close();
                     return;
                 }
@@ -242,20 +257,38 @@ export async function POST(req: NextRequest) {
                     return;
                 }
 
+                // Limit to max 30 articles as requested
+                if (fresh.length > 30) {
+                    send({ type: "status", icon: "✂️", message: `Trovati molti articoli: analizzo i primi 30 nuovi articoli.` });
+                    fresh.splice(30);
+                }
+
                 send({ type: "status", icon: "🆕", message: `${fresh.length} nuovi articoli da analizzare` });
 
                 // Step 4: Batch scoring
                 send({ type: "status", icon: "🤖", message: `Deepseek sta valutando ${fresh.length} articoli…` });
-                const scores = await batchScore(
-                    fresh.map((a: any) => ({ title: a.title, description: a.description ?? "" })),
-                    identikit
-                );
+
+                const SCORE_BATCH_SIZE = 30;
+                let scores: any[] = [];
+                for (let i = 0; i < fresh.length; i += SCORE_BATCH_SIZE) {
+                    const batch = fresh.slice(i, i + SCORE_BATCH_SIZE);
+                    if (fresh.length > SCORE_BATCH_SIZE) {
+                        send({ type: "status", icon: "🧠", message: `Valutazione batch ${Math.floor(i / SCORE_BATCH_SIZE) + 1} di ${Math.ceil(fresh.length / SCORE_BATCH_SIZE)} (${batch.length} articoli)…` });
+                    }
+                    const batchScores = await batchScore(
+                        batch.map((a: any) => ({ title: a.title, description: a.description ?? "" })),
+                        identikit
+                    );
+                    scores = scores.concat(batchScores);
+                }
 
                 const scored = fresh
                     .map((a: any, i: number) => ({
                         ...a,
                         score: scores[i]?.score ?? 5,
                         summary: scores[i]?.summary ?? "",
+                        translatedTitle: scores[i]?.translatedTitle ?? "",
+                        tags: scores[i]?.tags ?? [],
                         urlHash: hashes[discovered.indexOf(a)],
                     }))
                     .filter((a: any) => a.score >= PHASE1_MIN_SCORE)
@@ -284,10 +317,11 @@ export async function POST(req: NextRequest) {
                                 userId: session.user.id, url: a.url, urlHash: a.urlHash,
                                 title: a.title, description: a.description ?? "",
                                 summary: a.summary, personalizedContent: personalized, rawContent: fullContent,
+                                translatedTitle: a.translatedTitle, tags: a.tags,
                                 relevanceScore: a.score, source: a.source,
                                 publishedAt: a.publishedAt ? new Date(a.publishedAt) : null,
                             },
-                            update: { summary: a.summary, personalizedContent: personalized, rawContent: fullContent, relevanceScore: a.score },
+                            update: { summary: a.summary, personalizedContent: personalized, rawContent: fullContent, relevanceScore: a.score, translatedTitle: a.translatedTitle, tags: a.tags },
                         });
                         // Stream article immediately so client can display it
                         send({ type: "article_ready", article: saved });

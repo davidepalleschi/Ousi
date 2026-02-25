@@ -6,6 +6,7 @@ export const UserIdentikitSchema = z.object({
   skills: z.array(z.string()).describe("Competenze tecniche"),
   interests: z.array(z.string()).describe("Interessi core"),
   avoidTopics: z.array(z.string()).describe("Argomenti da evitare"),
+  aiProfile: z.string().optional().describe("Profilo generato dall'IA"),
 });
 export type UserIdentikit = z.infer<typeof UserIdentikitSchema>;
 

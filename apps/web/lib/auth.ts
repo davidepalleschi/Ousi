@@ -16,8 +16,8 @@ export const auth = betterAuth({
         enabled: true,
         minPasswordLength: 8,
     },
-    // trustedOrigins accepts any localhost port in dev
-    trustedOrigins: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
+    // trustedOrigins accepts any localhost port in dev, and our production domains
+    trustedOrigins: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "https://ousi.palleschi.dev", "https://ousi.domotica.uk"],
     advanced: {
         useSecureCookies: process.env.NODE_ENV === "production",
         generateId: () => crypto.randomUUID(),

@@ -55,7 +55,7 @@ export default function LoginPage() {
                                 value={form[id as keyof typeof form]}
                                 onChange={(e) => setForm((f) => ({ ...f, [id]: e.target.value }))}
                                 required
-                                className="w-full bg-transparent border-b border-ousi-stone/40 text-inherit pb-2 focus:outline-none focus:border-ousi-tan transition-colors text-sm"
+                                className="w-full bg-transparent border border-ousi-stone/30 rounded-xl px-4 py-3 text-inherit focus:outline-none focus:border-ousi-tan transition-colors text-sm"
                             />
                         </div>
                     ))}
@@ -65,7 +65,7 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-ousi-tan text-ousi-dark text-sm font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300"
+                        className="w-full py-3 rounded-full bg-ousi-tan text-ousi-dark text-sm font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300"
                     >
                         {loading ? "…" : "ENTRA"}
                     </button>

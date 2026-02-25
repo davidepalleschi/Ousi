@@ -44,13 +44,13 @@ export default function HomePage() {
             >
                 <Link
                     href="/onboarding"
-                    className="px-8 py-3 bg-ousi-tan text-ousi-dark font-medium tracking-widest text-sm hover:bg-ousi-brown hover:text-ousi-cream transition-all duration-300"
+                    className="px-8 py-3 rounded-full bg-ousi-tan text-ousi-dark font-medium tracking-widest text-sm hover:bg-ousi-brown hover:text-ousi-cream transition-all duration-300"
                 >
                     INIZIA
                 </Link>
                 <Link
                     href="/auth/login"
-                    className="px-8 py-3 border border-ousi-stone font-medium tracking-widest text-sm hover:border-ousi-brown hover:text-ousi-brown transition-all duration-300"
+                    className="px-8 py-3 rounded-full border border-ousi-stone font-medium tracking-widest text-sm hover:border-ousi-brown hover:text-ousi-brown transition-all duration-300"
                     style={{ color: "var(--fg)" }}
                 >
                     ACCEDI

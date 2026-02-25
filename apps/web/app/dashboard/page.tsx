@@ -10,6 +10,8 @@ interface Article {
     id: string;
     url: string;
     title: string;
+    translatedTitle?: string | null;
+    tags?: string[];
     description?: string | null;
     summary: string;
     personalizedContent?: string | null;
@@ -24,7 +26,7 @@ function ScoreBadge({ score }: { score: number }) {
         score >= 8 ? "#A6926D" : score >= 6 ? "#BFB8AA" : "#735F3C";
     return (
         <span
-            className="inline-flex items-center text-[10px] font-mono tracking-widest px-1.5 py-0.5"
+            className="inline-flex items-center text-[10px] font-mono tracking-widest px-1.5 py-0.5 rounded-md"
             style={{ color, border: `1px solid ${color}33` }}
         >
             {score}/10
@@ -41,7 +43,7 @@ function ArticleCard({ article }: { article: Article }) {
             layout
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="border border-ousi-stone/20 hover:border-ousi-stone/40 transition-colors cursor-pointer"
+            className="border border-ousi-stone/20 rounded-2xl hover:border-ousi-stone/40 transition-colors cursor-pointer"
             style={{ background: "var(--bg-surface)" }}
             onClick={() => router.push(article.personalizedContent ? `/article/${article.id}/personalized` : `/article/${article.id}`)}
         >
@@ -51,7 +53,7 @@ function ArticleCard({ article }: { article: Article }) {
                         <div className="flex items-center gap-2 flex-wrap">
                             <ScoreBadge score={article.relevanceScore} />
                             {hasDeep && (
-                                <span className="text-[10px] tracking-widest text-ousi-tan border border-ousi-tan/40 px-1.5 py-0.5">
+                                <span className="text-[10px] tracking-widest text-ousi-tan border border-ousi-tan/40 px-1.5 py-0.5 rounded-md">
                                     ✦ CURATO
                                 </span>
                             )}
@@ -61,8 +63,17 @@ function ArticleCard({ article }: { article: Article }) {
                             className="text-sm font-medium leading-snug line-clamp-2"
                             style={{ color: "var(--fg)" }}
                         >
-                            {article.title}
+                            {article.translatedTitle || article.title}
                         </p>
+                        {article.tags && article.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                {article.tags.slice(0, 3).map(tag => (
+                                    <span key={tag} className="text-[9px] tracking-wider text-ousi-tan/80 bg-ousi-tan/10 px-1.5 py-0.5 rounded border border-ousi-tan/20">
+                                        {tag.toUpperCase()}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <span className="shrink-0 text-[10px] tracking-widest text-ousi-stone group-hover:text-ousi-tan transition-colors mt-1">
                         LEGGI →
@@ -96,6 +107,11 @@ export default function DashboardPage() {
     const [processedCount, setProcessedCount] = useState<number | null>(null);
     const [progressLog, setProgressLog] = useState<Array<{ icon: string; message: string; score?: number }>>([]);
     const [clearing, setClearing] = useState(false);
+
+    // Sources modal state
+    const [showSourcesDialog, setShowSourcesDialog] = useState(false);
+    const [feedSources, setFeedSources] = useState<string[]>([]);
+    const [loadingSources, setLoadingSources] = useState(false);
 
     useEffect(() => {
         if (!isPending && !session) router.push("/auth/login");
@@ -179,6 +195,20 @@ export default function DashboardPage() {
         }
     }, []);
 
+    const handleShowSources = useCallback(async () => {
+        setShowSourcesDialog(true);
+        setLoadingSources(true);
+        try {
+            const res = await fetch("/api/feed/sources");
+            const data = await res.json();
+            setFeedSources(data.sources || []);
+        } catch {
+            setFeedSources([]);
+        } finally {
+            setLoadingSources(false);
+        }
+    }, []);
+
     if (isPending || !session) return (
         <div className="flex min-h-screen items-center justify-center">
             <div className="w-1.5 h-1.5 rounded-full bg-ousi-tan animate-ping" />
@@ -196,7 +226,7 @@ export default function DashboardPage() {
                     OUSI
                 </span>
                 <div className="flex items-center gap-5">
-                    <a href="/onboarding" className="text-ousi-stone text-xs tracking-widest hover:text-ousi-brown transition-colors">
+                    <a href="/profile" className="text-ousi-stone text-xs tracking-widest hover:text-ousi-brown transition-colors">
                         PROFILO
                     </a>
                     <button
@@ -218,7 +248,7 @@ export default function DashboardPage() {
                     onClick={handleRefresh}
                     disabled={refreshing || !hasProfile}
                     title={!hasProfile ? "Completa il profilo nell'onboarding prima di aggiornare" : ""}
-                    className="flex items-center gap-2 px-5 py-2 bg-ousi-tan text-ousi-dark text-xs font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300"
+                    className="flex items-center gap-2 px-5 py-2 rounded-full bg-ousi-tan text-ousi-dark text-xs font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300"
                 >
                     {refreshing ? (
                         <>
@@ -227,21 +257,32 @@ export default function DashboardPage() {
                         </>
                     ) : "AGGIORNA FEED"}
                 </button>
-                {articles.length > 0 && !refreshing && (
-                    <button
-                        onClick={handleClearArticles}
-                        disabled={clearing}
-                        className="text-ousi-stone/50 text-[10px] tracking-widest hover:text-red-400 disabled:opacity-30 transition-colors px-2 py-1"
-                        title="Elimina tutti gli articoli e ricrea il feed"
-                    >
-                        {clearing ? "…" : "↺ SVUOTA"}
-                    </button>
+                {hasProfile && !refreshing && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleShowSources}
+                            className="text-ousi-stone/60 text-[10px] tracking-widest bg-ousi-stone/5 rounded-lg hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors px-3 py-1.5"
+                            title="Visualizza i feed RSS attualmente in uso"
+                        >
+                            📡 FONTI
+                        </button>
+                        {articles.length > 0 && (
+                            <button
+                                onClick={handleClearArticles}
+                                disabled={clearing}
+                                className="text-ousi-stone/60 text-[10px] tracking-widest bg-ousi-stone/5 rounded-lg hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30 transition-colors px-3 py-1.5"
+                                title="Elimina tutti gli articoli e ricrea il feed"
+                            >
+                                {clearing ? "…" : "↺ SVUOTA"}
+                            </button>
+                        )}
+                    </div>
                 )}
             </motion.div>
 
             {/* Profile missing warning */}
             {!hasProfile && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 p-4 border border-ousi-tan/40 text-ousi-tan text-xs tracking-wide">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 p-4 rounded-2xl border border-ousi-tan/40 text-ousi-tan text-xs tracking-wide">
                     Completa il tuo{" "}
                     <a href="/onboarding" className="underline underline-offset-2 hover:text-ousi-brown transition-colors">
                         profilo nell'onboarding
@@ -348,6 +389,66 @@ export default function DashboardPage() {
                     </>
                 )}
             </section>
+
+            {/* Feed Sources Dialog */}
+            <AnimatePresence>
+                {showSourcesDialog && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowSourcesDialog(false)}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 10 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 10 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-2xl bg-[var(--bg)] border border-[var(--border)] rounded-3xl p-6 shadow-2xl flex flex-col max-h-[80vh]"
+                        >
+                            <div className="flex items-center justify-between mb-4 shrink-0">
+                                <h2 className="text-sm tracking-widest text-[var(--fg)] font-light">FONTI RSS ATTIVE</h2>
+                                <button
+                                    onClick={() => setShowSourcesDialog(false)}
+                                    className="text-ousi-stone w-8 h-8 flex items-center justify-center rounded-full hover:bg-ousi-stone/10 hover:text-[var(--fg)] transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto min-h-0 pr-2 space-y-3 custom-scrollbar">
+                                {loadingSources ? (
+                                    <div className="flex justify-center p-8">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-ousi-tan animate-ping" />
+                                    </div>
+                                ) : feedSources.length === 0 ? (
+                                    <p className="text-xs text-ousi-stone/60 py-4">Nessuna fonte trovata. Prova a completare o aggiornare il tuo profilo.</p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {feedSources.map((url, i) => (
+                                            <li key={i} className="text-xs bg-[var(--bg-surface)] p-3 rounded-2xl border border-ousi-stone/10 font-mono break-all text-ousi-stone/90">
+                                                <a href={url} target="_blank" rel="noopener noreferrer" className="hover:text-ousi-tan hover:underline transition-colors block">
+                                                    {url}
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+
+                            <div className="mt-5 pt-4 border-t border-[var(--border)] shrink-0 flex justify-end">
+                                <button
+                                    onClick={() => setShowSourcesDialog(false)}
+                                    className="px-4 py-1.5 text-[10px] tracking-widest rounded-full text-[var(--fg)] border border-ousi-stone/30 hover:border-ousi-tan hover:text-ousi-tan transition-colors"
+                                >
+                                    CHIUDI
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </main>
     );
 }

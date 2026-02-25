@@ -95,6 +95,8 @@ model ScoredArticle {
   summary             String    @db.Text  // Deepseek brief summary
   personalizedContent String?   @db.Text  // Deepseek full personalized article (phase 2)
   rawContent          String?   @db.Text  // Firecrawl raw scraped markdown (phase 2)
+  translatedTitle     String?   // Translated title to user language
+  tags                String[]  @default([])
   relevanceScore      Int       // 1–10
   source              String    // "newsapi" | "rss"
   publishedAt         DateTime?

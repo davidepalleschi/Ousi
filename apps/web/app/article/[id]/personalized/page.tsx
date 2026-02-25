@@ -10,6 +10,8 @@ interface Article {
     id: string;
     url: string;
     title: string;
+    translatedTitle?: string | null;
+    tags?: string[];
     personalizedContent?: string | null;
     relevanceScore: number;
     source: string;
@@ -52,7 +54,7 @@ export default function PersonalizedArticlePage() {
         <div className="flex min-h-screen items-center justify-center flex-col gap-4">
             <p className="text-ousi-stone text-sm">Versione personalizzata non disponibile.</p>
             <button onClick={() => router.push(`/article/${id}`)}
-                className="text-ousi-tan text-xs tracking-widest hover:text-ousi-brown transition-colors">
+                className="text-ousi-tan text-xs tracking-widest px-4 py-2 rounded-full hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors">
                 ← LEGGI ARTICOLO
             </button>
         </div>
@@ -64,17 +66,17 @@ export default function PersonalizedArticlePage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="flex items-center justify-between mb-10">
                 <button onClick={() => router.push("/dashboard")}
-                    className="flex items-center gap-2.5 text-ousi-stone text-xs tracking-widest hover:text-ousi-tan transition-colors">
+                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-full text-ousi-stone text-xs tracking-widest hover:bg-ousi-stone/10 hover:text-ousi-tan transition-colors">
                     <OusiLogo size={16} color="currentColor" />
                     ← FEED
                 </button>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                     <button onClick={() => router.push(`/article/${id}`)}
-                        className="text-ousi-stone text-[10px] tracking-widest hover:text-ousi-brown transition-colors">
+                        className="text-ousi-stone text-[10px] tracking-widest px-3 py-1.5 rounded-full hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors">
                         VERSIONE STANDARD
                     </button>
                     <a href={article.url} target="_blank" rel="noopener noreferrer"
-                        className="text-ousi-stone text-[10px] tracking-widest hover:text-ousi-brown transition-colors">
+                        className="text-ousi-stone text-[10px] tracking-widest px-3 py-1.5 rounded-full hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors">
                         ORIGINALE ↗
                     </a>
                 </div>
@@ -83,12 +85,22 @@ export default function PersonalizedArticlePage() {
             {/* Header */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 space-y-3">
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] tracking-widest text-ousi-tan border border-ousi-tan/40 px-2 py-0.5">
+                    <span className="text-[10px] tracking-widest text-ousi-tan border border-ousi-tan/40 px-2 py-0.5 rounded-md">
                         ✦ CURATO PER TE
                     </span>
                     <span className="text-[10px] tracking-widest text-ousi-stone/60 uppercase">{article.source}</span>
                 </div>
-                <h1 className="text-2xl font-light leading-snug" style={{ color: "var(--fg)" }}>{article.title}</h1>
+                <h1 className="text-2xl font-light leading-snug" style={{ color: "var(--fg)" }}>{article.translatedTitle || article.title}</h1>
+
+                {article.tags && article.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 pb-2">
+                        {article.tags.map(tag => (
+                            <span key={tag} className="text-[10px] tracking-wider text-ousi-tan/80 bg-ousi-tan/10 px-2 py-0.5 rounded border border-ousi-tan/20">
+                                {tag.toUpperCase()}
+                            </span>
+                        ))}
+                    </div>
+                )}
                 <p className="text-xs text-ousi-stone/50 tracking-wide">
                     Rielaborato e personalizzato da Ousi in base al tuo profilo
                 </p>
@@ -99,17 +111,19 @@ export default function PersonalizedArticlePage() {
             {/* Personalized content */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
                 style={{ color: "var(--fg)" }}>
-                <ReactMarkdown components={proseComponents}>{article.personalizedContent}</ReactMarkdown>
+                <div className="text-[15px] leading-relaxed tracking-wide prose-sm prose-p:mb-4 prose-li:mb-2">
+                    <ReactMarkdown components={proseComponents}>{article.personalizedContent}</ReactMarkdown>
+                </div>
             </motion.div>
 
             {/* Bottom nav */}
             <div className="mt-12 pt-6 flex items-center justify-between border-t" style={{ borderColor: "var(--border)" }}>
                 <button onClick={() => router.push("/dashboard")}
-                    className="text-ousi-stone text-xs tracking-widest hover:text-ousi-tan transition-colors">
+                    className="text-ousi-stone text-xs tracking-widest px-4 py-2 rounded-full hover:bg-ousi-stone/10 hover:text-ousi-tan transition-colors">
                     ← TORNA AL FEED
                 </button>
                 <a href={article.url} target="_blank" rel="noopener noreferrer"
-                    className="text-ousi-stone/50 text-[10px] tracking-widest hover:text-ousi-stone transition-colors">
+                    className="text-ousi-stone/50 text-[10px] tracking-widest px-4 py-2 rounded-full hover:bg-ousi-stone/10 hover:text-ousi-stone transition-colors">
                     FONTE ORIGINALE ↗
                 </a>
             </div>
