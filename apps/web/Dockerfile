@@ -22,7 +22,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate prisma client
-WORKDIR /app/apps/web
+WORKDIR /app/apps/server
 RUN npx prisma generate
 
 WORKDIR /app

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
+import { discoverArticles } from "../../feed/discoverService";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma ?? new PrismaClient();
@@ -37,36 +38,47 @@ Per ogni articolo nella lista JSON, assegna un punteggio di rilevanza da 1 a 10,
 Regole:
 - Score 9-10: articolo perfettamente in linea col profilo
 - Score 1-3: argomento irrilevante o da evitare
-- MUST return a valid JSON array ONLY, without wrapping markdown blocks, in this exact format:
-[{"score": 9, "summary": "...", "translatedTitle": "Titolo in Italiano...", "tags": ["Tech", "AI"]}, ...]
+- MUST return a valid JSON OBJECT with a single key "results" containing the array of evaluations:
+{"results": [{"score": 9, "summary": "...", "translatedTitle": "Titolo in Italiano...", "tags": ["Tech", "AI"]}, ...]}
 
 Lista articoli:
 ${JSON.stringify(articles.map((a, i) => ({ i, title: a.title, description: a.description })))}`;
 
-    const res = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.2,
-            max_tokens: 8000,
-        }),
-        signal: AbortSignal.timeout(60_000),
-    });
+    let res;
+    let data;
+    try {
+        res = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.2,
+                max_tokens: 8000,
+                response_format: { type: "json_object" }
+            }),
+            signal: AbortSignal.timeout(120_000), // Aumentato a 120 secondi
+        });
 
-    if (!res.ok) return articles.map(() => ({ score: 5, summary: "", translatedTitle: "", tags: [] }));
+        if (!res.ok) return articles.map(() => ({ score: 5, summary: "", translatedTitle: "", tags: [] }));
 
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content ?? "[]";
+        data = await res.json();
+    } catch (error: any) {
+        console.error("[batchScore] Fetch o lettura body fallita per timeout:", error);
+        throw error;
+    }
+
+
+    const raw = data.choices?.[0]?.message?.content ?? '{"results": []}';
     try {
         const cleaned = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(cleaned);
-        if (!Array.isArray(parsed)) throw new Error("Not an array");
-        return parsed.map((p: any) => ({
+        const articlesArray = Array.isArray(parsed) ? parsed : (parsed.results || []);
+        if (!Array.isArray(articlesArray)) throw new Error("Not an array in results");
+        return articlesArray.map((p: any) => ({
             score: typeof p.score === "number" ? Math.round(p.score) : 5,
             summary: typeof p.summary === "string" ? p.summary : "",
             translatedTitle: typeof p.translatedTitle === "string" ? p.translatedTitle : "",
@@ -90,12 +102,13 @@ async function scrapeArticle(url: string): Promise<string> {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
-            signal: AbortSignal.timeout(30_000),
+            signal: AbortSignal.timeout(60_000), // Aumentato a 60 secondi
         });
         if (!res.ok) return "";
         const data = await res.json();
         return (data?.data?.markdown ?? "").slice(0, 10000);
-    } catch {
+    } catch (error: any) {
+        console.error(`[scrapeArticle] Fetch failed or timed out per ${url}:`, error);
         return "";
     }
 }
@@ -115,19 +128,26 @@ Regole:
 Contenuto grezzo:
 ${rawContent.slice(0, 8000)}`;
 
-    const res = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3,
-            max_tokens: 500,
-        }),
-        signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) return "";
-    const data = await res.json();
+    let res;
+    let data;
+    try {
+        res = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.3,
+                max_tokens: 500,
+            }),
+            signal: AbortSignal.timeout(45_000), // Aumentato a 45 secondi
+        });
+        if (!res.ok) return "";
+        data = await res.json();
+    } catch (error: any) {
+        console.error(`[summarizeWithDeepseek] Fetch failed or timed out per "${title}":`, error);
+        throw error;
+    }
     return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
@@ -162,19 +182,26 @@ Regole ferree:
 Contenuto grezzo:
 ${content}`;
 
-    const res = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.4,
-            max_tokens: 1500,
-        }),
-        signal: AbortSignal.timeout(45_000),
-    });
-    if (!res.ok) return "";
-    const data = await res.json();
+    let res;
+    let data;
+    try {
+        res = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.4,
+                max_tokens: 1500,
+            }),
+            signal: AbortSignal.timeout(90_000), // Aumentato a 90 secondi
+        });
+        if (!res.ok) return "";
+        data = await res.json();
+    } catch (error: any) {
+        console.error(`[personalizeWithDeepseek] Fetch failed or timed out per "${title}":`, error);
+        throw error;
+    }
     return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
@@ -205,35 +232,28 @@ export async function POST(req: NextRequest) {
                 };
 
                 // Step 2: Discovery
+                console.log("[Refresh API] Step 2: Inizio discovery articoli...");
                 send({ type: "status", icon: "🔍", message: "Ricerca articoli in corso…" });
-                // Usa l'origine della richiesta corrente invece di un localhost hardcoded
-                const baseUrl = req.nextUrl.origin;
-                const discoverRes = await fetch(`${baseUrl}/api/feed/discover`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", cookie: cookieHeader },
-                    body: JSON.stringify({ interests: identikit.interests, skills: identikit.skills, role: identikit.role }),
-                });
-                if (!discoverRes.ok) {
-                    const errorText = await discoverRes.text().catch(() => "Impossibile leggere il messaggio di errore");
-                    console.error("[Refresh API] Errore da /api/feed/discover:", {
-                        status: discoverRes.status,
-                        url: `${baseUrl}/api/feed/discover`,
-                        error: errorText
-                    });
-                    send({ type: "error", message: `Errore nella ricerca articoli: ${discoverRes.status}` });
+                try {
+                    var discovered = await discoverArticles(identikit.interests, identikit.skills, identikit.role);
+                } catch (fetchErr: any) {
+                    console.error("[Refresh API] Eccezione grave in discoverArticles:", fetchErr);
+                    send({ type: "error", message: `Discovery fallita: ${fetchErr.message}` });
                     controller.close();
                     return;
                 }
-                const { articles: discovered } = await discoverRes.json();
+
                 if (!discovered?.length) {
                     send({ type: "status", icon: "😶", message: "Nessun articolo trovato." });
                     send({ type: "done", processed: 0 });
                     controller.close();
                     return;
                 }
+                console.log(`[Refresh API] Step 2 completato: trovati ${discovered.length} articoli totali.`);
                 send({ type: "status", icon: "📡", message: `Trovati ${discovered.length} articoli da RSS e NewsAPI` });
 
                 // Step 3: Filter already processed
+                console.log("[Refresh API] Step 3: Filtraggio articoli già processati...");
                 const hashes = discovered.map((a: any) =>
                     createHash("sha256").update(a.url).digest("hex").slice(0, 16)
                 );
@@ -266,21 +286,25 @@ export async function POST(req: NextRequest) {
                 send({ type: "status", icon: "🆕", message: `${fresh.length} nuovi articoli da analizzare` });
 
                 // Step 4: Batch scoring
+                console.log(`[Refresh API] Step 4: Inizio Batch Scoring su ${fresh.length} nuovi articoli tramite Deepseek...`);
                 send({ type: "status", icon: "🤖", message: `Deepseek sta valutando ${fresh.length} articoli…` });
 
-                const SCORE_BATCH_SIZE = 30;
+                const SCORE_BATCH_SIZE = 10;
                 let scores: any[] = [];
                 for (let i = 0; i < fresh.length; i += SCORE_BATCH_SIZE) {
                     const batch = fresh.slice(i, i + SCORE_BATCH_SIZE);
                     if (fresh.length > SCORE_BATCH_SIZE) {
                         send({ type: "status", icon: "🧠", message: `Valutazione batch ${Math.floor(i / SCORE_BATCH_SIZE) + 1} di ${Math.ceil(fresh.length / SCORE_BATCH_SIZE)} (${batch.length} articoli)…` });
                     }
+                    console.log(`[Refresh API] BatchScoring invio batch di ${batch.length} articoli a Deepseek...`);
                     const batchScores = await batchScore(
                         batch.map((a: any) => ({ title: a.title, description: a.description ?? "" })),
                         identikit
                     );
+                    console.log(`[Refresh API] BatchScoring ritornati ${batchScores.length} risultati da Deepseek.`);
                     scores = scores.concat(batchScores);
                 }
+                console.log(`[Refresh API] Step 4 completato.`);
 
                 const scored = fresh
                     .map((a: any, i: number) => ({
@@ -301,6 +325,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 // Step 5: Parallel batch scrape + personalize
+                console.log(`[Refresh API] Step 5: Inizio scraping e personalizzazione parallela (batch da 5) per ${scored.length} articoli rilevanti...`);
                 const BATCH_SIZE = 5;
                 send({ type: "status", icon: "✦", message: `Elaborazione in parallelo di ${scored.length} articoli (blocchi da ${BATCH_SIZE})…` });
 
@@ -309,8 +334,11 @@ export async function POST(req: NextRequest) {
                     await Promise.all(batch.map(async (a: any) => {
                         const shortTitle = a.title.length > 55 ? a.title.slice(0, 55) + "…" : a.title;
                         send({ type: "article", icon: "🔥", message: shortTitle, score: a.score });
+                        console.log(`[Refresh API] Inizio scraping Firecrawl per: ${shortTitle}`);
                         const fullContent = await scrapeArticle(a.url);
+                        console.log(`[Refresh API] Firecrawl concluso per: ${shortTitle}, chiamo Deepseek per personalizzazione...`);
                         const personalized = await personalizeWithDeepseek(fullContent, a.title, identikit);
+                        console.log(`[Refresh API] Deepseek personalizzazione conclusa per: ${shortTitle}, salvataggio nel database...`);
                         const saved = await prisma.scoredArticle.upsert({
                             where: { userId_urlHash: { userId: session.user.id, urlHash: a.urlHash } },
                             create: {
@@ -331,10 +359,12 @@ export async function POST(req: NextRequest) {
                         send({ type: "status", icon: "⏳", message: `${i + BATCH_SIZE}/${scored.length} completati — ancora ${remaining}…` });
                     }
                 }
+                console.log(`[Refresh API] Fine di tutti i processi. Elaborati ${fresh.length} articoli.`);
 
                 send({ type: "done", processed: fresh.length });
 
             } catch (e: any) {
+                console.error("[Refresh API] Errore gestito nel blocco principale:", e);
                 send({ type: "error", message: e?.message ?? "Errore interno del server." });
             } finally {
                 controller.close();

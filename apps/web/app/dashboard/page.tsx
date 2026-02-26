@@ -133,7 +133,11 @@ export default function DashboardPage() {
         setProgressLog([]);
         try {
             const res = await fetch("/api/articles/refresh", { method: "POST" });
-            if (!res.ok || !res.body) { setError("Errore di connessione."); return; }
+            if (!res.ok || !res.body) {
+                console.error("[Refresh Frontend] Errore HTTP restituito:", res.status, res.statusText);
+                setError(`Errore di connessione: ${res.statusText || res.status}`);
+                return;
+            }
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
@@ -147,6 +151,13 @@ export default function DashboardPage() {
                     if (!line.startsWith("data: ")) continue;
                     try {
                         const event = JSON.parse(line.slice(6));
+
+                        if (event.type === "error") {
+                            console.error("[Refresh Frontend] Ricevuto evento di errore dal server:", event);
+                        } else {
+                            console.log("[Refresh Frontend] Evento SSE:", event.type, event.icon || "", event.message || "");
+                        }
+
                         if (event.type === "article_ready") {
                             // Add article immediately, keep sorted by score
                             setArticles((prev) => {
@@ -166,8 +177,9 @@ export default function DashboardPage() {
                     } catch { /* ignore */ }
                 }
             }
-        } catch {
-            setError("Errore di rete. Riprova.");
+        } catch (error: any) {
+            console.error("[Refresh Frontend] Errore di rete o eccezione durante il refresh:", error);
+            setError(`Errore di rete. Riprova. ${error?.message || ""}`);
         } finally {
             setRefreshing(false);
         }
@@ -239,45 +251,48 @@ export default function DashboardPage() {
             </motion.div>
 
             {/* Greeting + Refresh */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-end justify-between mb-8">
+            {/* Greeting + Refresh */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10 mt-2 sm:mt-0">
                 <div>
-                    <p className="text-ousi-tan text-[10px] tracking-widest mb-1">BENVENUTO</p>
-                    <h1 className="text-xl font-light" style={{ color: "var(--fg)" }}>{session.user.name}</h1>
+                    <p className="text-ousi-tan text-xs sm:text-[10px] tracking-widest mb-1 sm:mb-2">BENVENUTO</p>
+                    <h1 className="text-3xl sm:text-2xl font-light" style={{ color: "var(--fg)" }}>{session.user.name}</h1>
                 </div>
-                <button
-                    onClick={handleRefresh}
-                    disabled={refreshing || !hasProfile}
-                    title={!hasProfile ? "Completa il profilo nell'onboarding prima di aggiornare" : ""}
-                    className="flex items-center gap-2 px-5 py-2 rounded-full bg-ousi-tan text-ousi-dark text-xs font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300"
-                >
-                    {refreshing ? (
-                        <>
-                            <span className="inline-block w-2 h-2 rounded-full bg-ousi-dark opacity-60 animate-ping" />
-                            ANALISI IN CORSO…
-                        </>
-                    ) : "AGGIORNA FEED"}
-                </button>
-                {hasProfile && !refreshing && (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleShowSources}
-                            className="text-ousi-stone/60 text-[10px] tracking-widest bg-ousi-stone/5 rounded-lg hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors px-3 py-1.5"
-                            title="Visualizza i feed RSS attualmente in uso"
-                        >
-                            📡 FONTI
-                        </button>
-                        {articles.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing || !hasProfile}
+                        title={!hasProfile ? "Completa il profilo nell'onboarding prima di aggiornare" : ""}
+                        className="flex items-center justify-center gap-2 px-6 py-3.5 sm:py-2.5 rounded-2xl sm:rounded-full bg-ousi-tan text-ousi-dark text-sm sm:text-xs font-semibold sm:font-medium tracking-widest hover:bg-ousi-brown hover:text-ousi-cream disabled:opacity-40 transition-all duration-300 w-full sm:w-auto shadow-sm"
+                    >
+                        {refreshing ? (
+                            <>
+                                <span className="inline-block w-2 h-2 rounded-full bg-ousi-dark opacity-60 animate-ping" />
+                                ANALISI IN CORSO…
+                            </>
+                        ) : "AGGIORNA FEED"}
+                    </button>
+                    {hasProfile && !refreshing && (
+                        <div className="flex flex-row items-center gap-3 sm:gap-2 w-full sm:w-auto">
                             <button
-                                onClick={handleClearArticles}
-                                disabled={clearing}
-                                className="text-ousi-stone/60 text-[10px] tracking-widest bg-ousi-stone/5 rounded-lg hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30 transition-colors px-3 py-1.5"
-                                title="Elimina tutti gli articoli e ricrea il feed"
+                                onClick={handleShowSources}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-ousi-stone/80 text-xs sm:text-[10px] font-medium sm:font-normal tracking-widest bg-[var(--bg-surface)] sm:bg-ousi-stone/5 border border-ousi-stone/10 sm:border-transparent rounded-xl sm:rounded-lg hover:bg-ousi-stone/10 hover:text-ousi-brown transition-colors px-4 py-3 sm:py-1.5"
+                                title="Visualizza i feed RSS attualmente in uso"
                             >
-                                {clearing ? "…" : "↺ SVUOTA"}
+                                📡 FONTI
                             </button>
-                        )}
-                    </div>
-                )}
+                            {articles.length > 0 && (
+                                <button
+                                    onClick={handleClearArticles}
+                                    disabled={clearing}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-ousi-stone/80 text-xs sm:text-[10px] font-medium sm:font-normal tracking-widest bg-[var(--bg-surface)] sm:bg-ousi-stone/5 border border-ousi-stone/10 sm:border-transparent rounded-xl sm:rounded-lg hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 disabled:opacity-30 transition-colors px-4 py-3 sm:py-1.5"
+                                    title="Elimina tutti gli articoli e ricrea il feed"
+                                >
+                                    {clearing ? "…" : "↺ SVUOTA"}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </motion.div>
 
             {/* Profile missing warning */}

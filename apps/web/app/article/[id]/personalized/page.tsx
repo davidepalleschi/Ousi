@@ -60,6 +60,18 @@ export default function PersonalizedArticlePage() {
         </div>
     );
 
+    const content = article.personalizedContent || "";
+    const hasApprofondimento = /##?\s*Approfondimento personalizzato/i.test(content);
+
+    let summaryPart = "";
+    let personalizedPart = "";
+
+    if (hasApprofondimento) {
+        const parts = content.split(/##?\s*Approfondimento personalizzato/i);
+        summaryPart = parts[0].replace(/##?\s*Riepilogo/i, "").trim();
+        personalizedPart = parts.slice(1).join("## Approfondimento personalizzato").trim();
+    }
+
     return (
         <main className="min-h-screen px-6 py-10 max-w-4xl mx-auto">
             {/* Top bar */}
@@ -111,9 +123,36 @@ export default function PersonalizedArticlePage() {
             {/* Personalized content */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
                 style={{ color: "var(--fg)" }}>
-                <div className="text-[15px] leading-relaxed tracking-wide prose-sm prose-p:mb-4 prose-li:mb-2">
-                    <ReactMarkdown components={proseComponents}>{article.personalizedContent}</ReactMarkdown>
-                </div>
+
+                {hasApprofondimento ? (
+                    <>
+                        {summaryPart && (
+                            <div className="mb-10 bg-ousi-stone/5 border border-ousi-tan/30 rounded-xl p-6 shadow-sm relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-ousi-tan opacity-80" />
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-[10px] tracking-[0.2em] text-ousi-tan font-semibold uppercase">
+                                        Riepilogo
+                                    </span>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-ousi-tan/30 to-transparent" />
+                                </div>
+                                <div className="text-[15px] leading-relaxed tracking-wide prose-sm prose-p:mb-4 prose-li:mb-2 prose-p:last:mb-0">
+                                    <ReactMarkdown components={proseComponents}>{summaryPart}</ReactMarkdown>
+                                </div>
+                            </div>
+                        )}
+
+                        {personalizedPart && (
+                            <div className="text-[15px] leading-relaxed tracking-wide prose-sm prose-p:mb-4 prose-li:mb-2">
+                                <h2 className="text-lg font-light mb-4 text-ousi-tan">Approfondimento personalizzato</h2>
+                                <ReactMarkdown components={proseComponents}>{personalizedPart}</ReactMarkdown>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="text-[15px] leading-relaxed tracking-wide prose-sm prose-p:mb-4 prose-li:mb-2">
+                        <ReactMarkdown components={proseComponents}>{content}</ReactMarkdown>
+                    </div>
+                )}
             </motion.div>
 
             {/* Bottom nav */}

@@ -6,7 +6,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=${DATABASE_URL:-postgresql://ousi:ousi@db:5432/ousi?schema=public}
     depends_on:
       - db
@@ -29,14 +29,14 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=${DATABASE_URL:-postgresql://ousi:ousi@db:5432/ousi?schema=public}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=https://ousi.palleschi.dev
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://ousi.domotica.uk}
       # We route via backend for server-side
-      - FIRECRAWL_BASE_URL=${FIRECRAWL_BASE_URL:-http://firecrawl:3002}
+      - FIRECRAWL_BASE_URL=${FIRECRAWL_BASE_URL:-http://localhost:3002}
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-local}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
     depends_on:

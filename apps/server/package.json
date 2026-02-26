@@ -8,7 +8,7 @@
         "dev": "ts-node src/index.ts"
     },
     "dependencies": {
-        "@fastify/cors": "^11.2.0",
+        "@fastify/cors": "^8.5.0",
         "@repo/shared": "*",
         "@trpc/server": "^10.45.0",
         "fastify": "^4.26.0",

@@ -61,7 +61,7 @@ export default function ProfilePage() {
             if (res.ok) {
                 setSaveSuccess(true);
                 setIsEditing(false);
-                setTimeout(() => setSaveSuccess(false), 3000);
+                setTimeout(() => setSaveSuccess(false), 30_000);
             }
         } catch (error) {
             console.error("Error saving profile:", error);
